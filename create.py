@@ -3,13 +3,13 @@ import os
 from weaviate.auth import AuthApiKey
 from weaviate.classes.config import Property, DataType, Configure, VectorDistances, ReferenceProperty
 
-client = weaviate.connect_to_wcs(
-    cluster_url=os.getenv("JP_WCS_URL"),
-    auth_credentials=AuthApiKey(os.getenv("JP_WCS_ADMIN_KEY")),
+client = weaviate.connect_to_embedded(
     headers={
-        "X-OpenAI-Api-Key": os.getenv("OPENAI_API_KEY")
+        "X-Cohere-Api-Key": os.getenv("COHERE_API_KEY"),
+        "X-Openai-Api-Key": os.getenv("OPENAI_API_KEY")
     }
 )
+
 
 try:
     client.collections.delete(["Movie", "Review"])
@@ -26,7 +26,7 @@ try:
             Property(name="runtime", data_type=DataType.INT),
             Property(name="imdb_id", data_type=DataType.TEXT, skip_vectorization=True),
         ],
-        vectorizer_config=Configure.Vectorizer.text2vec_openai(),
+        vectorizer_config=Configure.Vectorizer.text2vec_cohere(),
         generative_config=Configure.Generative.openai(),
         vector_index_config=Configure.VectorIndex.hnsw(distance_metric=VectorDistances.COSINE),
         inverted_index_config=Configure.inverted_index(index_timestamps=True)
@@ -35,7 +35,7 @@ try:
     # Import ["username", "content", "id"]
     reviews = client.collections.create(
         name="Review",
-        vectorizer_config=Configure.Vectorizer.text2vec_openai(),
+        vectorizer_config=Configure.Vectorizer.text2vec_cohere(),
         generative_config=Configure.Generative.openai(),
         properties=[
             Property(name="username", data_type=DataType.TEXT, skip_vectorization=True),

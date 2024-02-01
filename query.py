@@ -1,7 +1,6 @@
 import weaviate
-from weaviate.auth import AuthApiKey
 import os
-from datetime import datetime
+from weaviate.auth import AuthApiKey
 
 client = weaviate.connect_to_wcs(
     cluster_url=os.getenv("JP_WCS_URL"),

@@ -5,11 +5,10 @@ import pandas as pd
 from datetime import datetime, timezone
 from weaviate.util import generate_uuid5
 
-client = weaviate.connect_to_wcs(
-    cluster_url=os.getenv("JP_WCS_URL"),
-    auth_credentials=AuthApiKey(os.getenv("JP_WCS_ADMIN_KEY")),
+client = weaviate.connect_to_embedded(
     headers={
-        "X-OpenAI-Api-Key": os.getenv("OPENAI_API_KEY")
+        "X-Cohere-Api-Key": os.getenv("COHERE_API_KEY"),
+        "X-Openai-Api-Key": os.getenv("OPENAI_API_KEY")
     }
 )
 
@@ -20,7 +19,7 @@ df = pd.read_json("data/movie_reviews_1990_2024_20_movies_info.json")
 rdf = pd.read_json("data/movie_reviews_1990_2024_20_movie_reviews.json")
 
 ref_id_map = dict()
-with reviews.batch.fixed_size(200) as batch:
+with reviews.batch.dynamic() as batch:
     for i, row in rdf.iterrows():
         movie_id = row["id"]
         ref_ids = list()
@@ -37,9 +36,11 @@ with reviews.batch.fixed_size(200) as batch:
             )
             ref_ids.append(review_uuid)
         ref_id_map[movie_id] = ref_ids
+        if i % 100 == 0:
+            print(i)
 
 
-
+print("Errors?")
 if len(reviews.batch.failed_objects) > 0:
     print(reviews.batch.failed_objects[:5])
 if len(reviews.batch.failed_references) > 0:
@@ -47,7 +48,7 @@ if len(reviews.batch.failed_references) > 0:
 
 
 # ["title", "tagline", "overview", "vote_average", "release_date", "runtime", "imdb_id"]
-with movies.batch.fixed_size(batch_size=100, concurrent_requests=2) as batch:
+with movies.batch.dynamic() as batch:
     for i, row in df.iterrows():
         cols = ["title", "tagline", "overview", "vote_average", "runtime", "imdb_id"]
         movie_id = row["id"]
@@ -63,8 +64,10 @@ with movies.batch.fixed_size(batch_size=100, concurrent_requests=2) as batch:
             references=refs,
             uuid=movie_uuid
         )
+        if i % 100 == 0:
+            print(i)
 
-
+print("Errors?")
 if len(movies.batch.failed_objects) > 0:
     print(movies.batch.failed_objects[:5])
 if len(movies.batch.failed_references) > 0:
