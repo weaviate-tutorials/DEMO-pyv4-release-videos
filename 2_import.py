@@ -1,5 +1,4 @@
 import weaviate
-from weaviate.auth import AuthApiKey
 import os
 import pandas as pd
 from datetime import datetime, timezone
@@ -7,10 +6,10 @@ from weaviate.util import generate_uuid5
 
 client = weaviate.connect_to_embedded(
     headers={
-        "X-Cohere-Api-Key": os.getenv("COHERE_API_KEY"),
-        "X-Openai-Api-Key": os.getenv("OPENAI_API_KEY")
+        "X-Cohere-Api-Key": os.getenv("COHERE_API_KEY")  # Providing the Cohere API key as `text2vec-cohere` is used for vectorization
     }
 )
+
 
 movies = client.collections.get("Movie")
 reviews = client.collections.get("Review")
@@ -19,7 +18,7 @@ df = pd.read_json("data/movie_reviews_1990_2024_20_movies_info.json")
 rdf = pd.read_json("data/movie_reviews_1990_2024_20_movie_reviews.json")
 
 ref_id_map = dict()
-with reviews.batch.dynamic() as batch:
+with reviews.batch.fixed_size(batch_size=50, concurrent_requests=2) as batch:
     for i, row in rdf.iterrows():
         movie_id = row["id"]
         ref_ids = list()
@@ -36,19 +35,15 @@ with reviews.batch.dynamic() as batch:
             )
             ref_ids.append(review_uuid)
         ref_id_map[movie_id] = ref_ids
-        if i % 100 == 0:
-            print(i)
 
 
-print("Errors?")
-if len(reviews.batch.failed_objects) > 0:
+if len(reviews.batch.failed_objects) > 0 or len(reviews.batch.failed_references) > 0:
     print(reviews.batch.failed_objects[:5])
-if len(reviews.batch.failed_references) > 0:
     print(reviews.batch.failed_references[:5])
 
 
-# ["title", "tagline", "overview", "vote_average", "release_date", "runtime", "imdb_id"]
-with movies.batch.dynamic() as batch:
+# ["title", "tagline", "overview", "vote_average", "release_date", "runtime", "imdb_id", "tmdb_id"]
+with movies.batch.fixed_size(batch_size=50, concurrent_requests=2) as batch:
     for i, row in df.iterrows():
         cols = ["title", "tagline", "overview", "vote_average", "runtime", "imdb_id"]
         movie_id = row["id"]
@@ -67,11 +62,10 @@ with movies.batch.dynamic() as batch:
         if i % 100 == 0:
             print(i)
 
-print("Errors?")
-if len(movies.batch.failed_objects) > 0:
-    print(movies.batch.failed_objects[:5])
-if len(movies.batch.failed_references) > 0:
-    print(movies.batch.failed_references[:5])
+
+if len(reviews.batch.failed_objects) > 0 or len(reviews.batch.failed_references) > 0:
+    print(reviews.batch.failed_objects[:5])
+    print(reviews.batch.failed_references[:5])
 
 
 client.close()
